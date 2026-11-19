@@ -99,9 +99,8 @@ const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   spy();
 })();
 
-(() => {
-  const c = $("#smoke");
-  if (!c || reduced) return;
+$$("[data-smoke]").forEach(c => {
+  if (reduced) return;
   const ctx = c.getContext("2d");
   let w, h, dpr, puffs = [], embers = [], running = true;
 
@@ -190,7 +189,7 @@ const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
-})();
+});
 
 (() => {
   const KEY = "smokeshack-order";
