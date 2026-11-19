@@ -11,6 +11,41 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 (() => {
+  const root = document.documentElement, box = $("#launch");
+  if (!root.classList.contains("prelaunch") || !box) return;
+  const at = Date.parse(root.dataset.launch);
+  const els = { d: $("[data-cd=d]"), h: $("[data-cd=h]"), m: $("[data-cd=m]"), s: $("[data-cd=s]") };
+  const pad = n => String(n).padStart(2, "0");
+  $("main").setAttribute("aria-hidden", "true");
+  let timer;
+  const open = () => {
+    clearInterval(timer);
+    box.classList.add("is-out");
+    setTimeout(() => {
+      root.classList.remove("prelaunch");
+      $("main").removeAttribute("aria-hidden");
+      box.remove();
+      dispatchEvent(new Event("scroll"));
+    }, 950);
+  };
+  const tick = () => {
+    const left = at - Date.now();
+    if (left <= 0) return open();
+    const t = Math.floor(left / 1000);
+    const v = { d: Math.floor(t / 86400), h: Math.floor(t / 3600) % 24, m: Math.floor(t / 60) % 60, s: t % 60 };
+    for (const k in v) {
+      const txt = pad(v[k]);
+      if (els[k].textContent !== txt) {
+        els[k].textContent = txt;
+        if (!reduced) { els[k].classList.remove("tick"); void els[k].offsetWidth; els[k].classList.add("tick"); }
+      }
+    }
+  };
+  tick();
+  timer = setInterval(tick, 250);
+})();
+
+(() => {
   if (SITE.address) $("[data-address]").textContent = SITE.address;
   if (SITE.mapUrl) { const m = $("[data-map]"); m.href = SITE.mapUrl; m.hidden = false; }
   if (SITE.hours.length) {
