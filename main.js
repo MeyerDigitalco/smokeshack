@@ -75,6 +75,7 @@ const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const setActive = id => tabs.forEach(t => {
     const on = t.getAttribute("href") === "#" + id;
     t.classList.toggle("is-active", on);
+    on ? t.setAttribute("aria-current", "true") : t.removeAttribute("aria-current");
     if (on && bar.scrollWidth > bar.clientWidth) bar.scrollTo({ left: t.offsetLeft - bar.clientWidth / 2 + t.offsetWidth / 2, behavior: "smooth" });
   });
   let lock = 0, current = "";
