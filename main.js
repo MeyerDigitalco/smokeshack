@@ -8,6 +8,7 @@ const SITE = {
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const track = (name, data) => { try { if (window.umami) window.umami.track(name, data); } catch {} };
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 (() => {
@@ -243,9 +244,10 @@ $$("[data-smoke]").forEach(c => {
     f ? f.q++ : cart.push({ n, p, q: 1 });
     save(); render();
     say(`Added <b>${n}</b>`);
+    track("add_to_order", { item: n, price: p });
   };
 
-  const open = () => { drawer.classList.add("open"); drawer.setAttribute("aria-hidden", "false"); document.body.style.overflow = "hidden"; setTimeout(() => $(".drawer__x").focus(), 50); };
+  const open = () => { track("open_order", { items: count(), total: total() }); drawer.classList.add("open"); drawer.setAttribute("aria-hidden", "false"); document.body.style.overflow = "hidden"; setTimeout(() => $(".drawer__x").focus(), 50); };
   const close = () => { drawer.classList.remove("open"); drawer.setAttribute("aria-hidden", "true"); document.body.style.overflow = ""; };
 
   document.addEventListener("click", e => {
@@ -284,6 +286,7 @@ $$("[data-smoke]").forEach(c => {
         : ["COLLECTION", `Collection time: ${d.get("time") || "ASAP"}`]),
       d.get("notes") ? `Notes: ${d.get("notes")}` : ""
     ].filter((l, i, a) => l !== "" || a[i - 1] !== "").join("\n").trim();
+    track("order_sent", { mode: d.get("mode"), items: count(), total: total() });
     window.open(`https://wa.me/${SITE.whatsapp}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
   });
 
