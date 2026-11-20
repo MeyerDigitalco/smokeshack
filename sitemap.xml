@@ -7,4 +7,6 @@
     <image:image><image:loc>https://www.smokeshack.co.za/img/cheese-roll.webp</image:loc></image:image>
     <image:image><image:loc>https://www.smokeshack.co.za/img/pitmaster.webp</image:loc></image:image>
   </url>
+  <url><loc>https://www.smokeshack.co.za/terms.html</loc><lastmod>2026-11-20</lastmod></url>
+  <url><loc>https://www.smokeshack.co.za/privacy.html</loc><lastmod>2026-11-20</lastmod></url>
 </urlset>
