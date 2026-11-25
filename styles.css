@@ -420,3 +420,6 @@ html.prelaunch .nav,html.prelaunch .fab,html.prelaunch .hero__scroll{visibility:
 @media (max-width:980px){.whole{grid-template-columns:1fr}.whole__copy{order:-1}}
 [data-time-wrap][hidden]{display:none!important}
 @media (max-width:560px){.whole__facts b{font-size:21px}.whole__facts span{letter-spacing:.12em;font-size:11px}}
+.whole__deposit{margin:20px 0 0;padding:14px 16px;border-radius:var(--r);background:rgba(226,87,43,.1);box-shadow:inset 0 0 0 1px rgba(226,87,43,.45);font-size:15px;line-height:1.5;color:#efe6d6;max-width:52ch}
+.whole__deposit b{color:#ff8a3d}
+.total__note b{color:#ffb07a}

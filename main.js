@@ -226,6 +226,8 @@ $$("[data-smoke]").forEach(c => {
     totalEl.textContent = rand(total());
     const hasPre = cart.some(i => i.pre);
     estNote.hidden = !hasPre;
+    const preTotal = cart.filter(i => i.pre).reduce((n, i) => n + i.q * i.p, 0);
+    $("[data-deposit]").textContent = rand(Math.ceil(preTotal / 2));
     preWrap.hidden = !hasPre;
     form.elements.when.required = hasPre;
     if (hasPre) {
@@ -303,6 +305,7 @@ $$("[data-smoke]").forEach(c => {
       ...(fee() ? [`Delivery fee: from ${rand(fee())}, final fee by distance`] : []),
       ...(fee() && dist ? [`Distance: about ${dist.km.toFixed(1)} km${dist.exact ? "" : " (suburb estimate)"}`] : []),
       `Total: ${cart.some(i => i.pre) ? "about " : ""}${rand(total())}`,
+      ...(cart.some(i => i.pre) ? [`Deposit (50% of brisket): about ${rand(Math.ceil(cart.filter(i => i.pre).reduce((n, i) => n + i.q * i.p, 0) / 2))}, please send payment details`] : []),
       ...(cart.some(i => i.pre) && d.get("when") ? [`PRE-ORDER for: ${new Date(d.get("when")).toLocaleString("en-ZA", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}`] : []),
       `Name: ${d.get("name")}`,
       ...(d.get("mode") === "deliver"
