@@ -201,7 +201,7 @@ $$("[data-smoke]").forEach(c => {
   try { cart = JSON.parse(localStorage.getItem(KEY)) || []; } catch { cart = []; }
 
   const drawer = $("#drawer"), lines = $("[data-lines]"), empty = $("[data-empty]");
-  const feeRow = $("[data-fee]");
+  const feeRow = $("[data-fee]"), estNote = $("[data-est-note]"), preWrap = $("[data-preorder]"), timeWrap = $("[data-time-wrap]");
   $("[data-fee-amt]").textContent = "R" + SITE.deliveryFee;
   const totalEl = $("[data-total]"), send = $("[data-send]"), form = $("[data-form]"), toast = $("[data-toast]");
   const rand = n => "R" + n.toLocaleString("en-ZA");
@@ -224,6 +224,16 @@ $$("[data-smoke]").forEach(c => {
     form.classList.toggle("is-hidden", n === 0);
     send.disabled = n === 0;
     totalEl.textContent = rand(total());
+    const hasPre = cart.some(i => i.pre);
+    estNote.hidden = !hasPre;
+    preWrap.hidden = !hasPre;
+    form.elements.when.required = hasPre;
+    if (hasPre) {
+      const min = new Date(Date.now() + 24 * 3600e3 + 5 * 60e3);
+      const pad = v => String(v).padStart(2, "0");
+      form.elements.when.min = `${min.getFullYear()}-${pad(min.getMonth() + 1)}-${pad(min.getDate())}T${pad(min.getHours())}:${pad(min.getMinutes())}`;
+    }
+    timeWrap.hidden = hasPre;
     feeRow.hidden = !fee();
     lines.innerHTML = cart.map((i, k) => `
       <li class="line">
@@ -231,9 +241,9 @@ $$("[data-smoke]").forEach(c => {
         <b class="line__sum">${rand(i.q * i.p)}</b>
         <span class="qty"><button type="button" data-dec="${k}" aria-label="One less">−</button><b>${i.q}</b><button type="button" data-inc="${k}" aria-label="One more">+</button></span>
         <button class="line__rm" type="button" data-rm="${k}">Remove</button>
-        <div class="extras" role="group" aria-label="Free extras for ${i.n}">
-          <span class="extras__label">Free extras${i.q > 1 ? " (each)" : ""}</span>
-          ${EXTRAS.map(x => `<button type="button" class="extra${(i.x || []).includes(x) ? " on" : ""}" data-extra="${k}" data-x="${x}" aria-pressed="${(i.x || []).includes(x)}">+ ${x}</button>`).join("")}
+        <div class="extras" role="group" aria-label="${i.pre ? "Pre-order" : "Free extras"} for ${i.n}">
+          ${i.pre ? `<span class="extras__label">Pre-order, priced by weight</span>` : `<span class="extras__label">Free extras${i.q > 1 ? " (each)" : ""}</span>`}
+          ${i.pre ? "" : EXTRAS.map(x => `<button type="button" class="extra${(i.x || []).includes(x) ? " on" : ""}" data-extra="${k}" data-x="${x}" aria-pressed="${(i.x || []).includes(x)}">+ ${x}</button>`).join("")}
         </div>
       </li>`).join("");
   };
@@ -245,9 +255,9 @@ $$("[data-smoke]").forEach(c => {
     toastT = setTimeout(() => toast.classList.remove("show"), 1800);
   };
 
-  const add = (n, p) => {
+  const add = (n, p, pre = false) => {
     const f = cart.find(i => i.n === n);
-    f ? f.q++ : cart.push({ n, p, q: 1 });
+    f ? f.q++ : cart.push(pre ? { n, p, q: 1, pre: true } : { n, p, q: 1 });
     save(); render();
     say(`Added <b>${n}</b>`);
     track("add_to_order", { item: n, price: p });
@@ -288,15 +298,16 @@ $$("[data-smoke]").forEach(c => {
     const msg = [
       "Howdy Smoke Shack! New order:",
       "",
-      ...cart.map(i => `${i.q} x ${i.n} (${rand(i.p * i.q)})${i.x && i.x.length ? `\n   extra ${i.x.join(", ").toLowerCase()}` : ""}`),
+      ...cart.map(i => `${i.q} x ${i.n} (${i.pre ? "about " : ""}${rand(i.p * i.q)})${i.x && i.x.length ? `\n   extra ${i.x.join(", ").toLowerCase()}` : ""}`),
       "",
       ...(fee() ? [`Delivery fee: from ${rand(fee())}, final fee by distance`] : []),
       ...(fee() && dist ? [`Distance: about ${dist.km.toFixed(1)} km${dist.exact ? "" : " (suburb estimate)"}`] : []),
-      `Total: ${rand(total())}`,
+      `Total: ${cart.some(i => i.pre) ? "about " : ""}${rand(total())}`,
+      ...(cart.some(i => i.pre) && d.get("when") ? [`PRE-ORDER for: ${new Date(d.get("when")).toLocaleString("en-ZA", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}`] : []),
       `Name: ${d.get("name")}`,
       ...(d.get("mode") === "deliver"
-        ? ["DELIVERY", `Address: ${d.get("address").trim()}${d.get("suburb") ? ", " + d.get("suburb") : ""}, Rustenburg`, `Delivery time: ${d.get("time") || "ASAP"}`]
-        : ["COLLECTION", `Collection time: ${d.get("time") || "ASAP"}`]),
+        ? ["DELIVERY", `Address: ${d.get("address").trim()}${d.get("suburb") ? ", " + d.get("suburb") : ""}, Rustenburg`, ...(cart.some(i => i.pre) ? [] : [`Delivery time: ${d.get("time") || "ASAP"}`])]
+        : ["COLLECTION", ...(cart.some(i => i.pre) ? [] : [`Collection time: ${d.get("time") || "ASAP"}`])]),
       d.get("notes") ? `Notes: ${d.get("notes")}` : ""
     ].filter((l, i, a) => l !== "" || a[i - 1] !== "").join("\n").trim();
     track("order_sent", { mode: d.get("mode"), items: count(), total: total() });
@@ -359,6 +370,20 @@ $$("[data-smoke]").forEach(c => {
     }
   };
   distBtn.addEventListener("click", checkDistance);
+
+  const wSel = $("[data-whole-weight]"), wEst = $("[data-whole-est]"), wAdd = $("[data-whole-add]");
+  if (wSel) {
+    const per = 350;
+    const kg = () => +wSel.value;
+    const show = () => { wEst.textContent = rand(Math.round(kg() * per)); };
+    wSel.addEventListener("change", show);
+    show();
+    wAdd.addEventListener("click", () => {
+      const w = kg();
+      add(`Whole Piece Brisket, about ${w} kg`, Math.round(w * per), true);
+      open();
+    });
+  }
   form.addEventListener("input", e => { if (e.target.name === "address" || e.target.name === "suburb") dist = null; });
   form.addEventListener("change", e => {
     if (e.target.name !== "address" && e.target.name !== "suburb") return;
