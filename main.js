@@ -1,6 +1,7 @@
 const SITE = {
   whatsapp: "27605375032",
   deliveryFee: 35,
+  shop: { lat: -25.69125, lon: 27.2176 },
   address: "14 Swartbos Avenue, Protea Park, Rustenburg",
   mapUrl: "https://www.google.com/maps/search/?api=1&query=14+Swartbos+Avenue%2C+Protea+Park%2C+Rustenburg",
   hours: []
@@ -195,6 +196,7 @@ $$("[data-smoke]").forEach(c => {
 
 (() => {
   const KEY = "smokeshack-order";
+  const EXTRAS = ["Jalapeños", "Sweet peppadews", "Grilled onion"];
   let cart = [];
   try { cart = JSON.parse(localStorage.getItem(KEY)) || []; } catch { cart = []; }
 
@@ -229,6 +231,10 @@ $$("[data-smoke]").forEach(c => {
         <b class="line__sum">${rand(i.q * i.p)}</b>
         <span class="qty"><button type="button" data-dec="${k}" aria-label="One less">−</button><b>${i.q}</b><button type="button" data-inc="${k}" aria-label="One more">+</button></span>
         <button class="line__rm" type="button" data-rm="${k}">Remove</button>
+        <div class="extras" role="group" aria-label="Free extras for ${i.n}">
+          <span class="extras__label">Free extras${i.q > 1 ? " (each)" : ""}</span>
+          ${EXTRAS.map(x => `<button type="button" class="extra${(i.x || []).includes(x) ? " on" : ""}" data-extra="${k}" data-x="${x}" aria-pressed="${(i.x || []).includes(x)}">+ ${x}</button>`).join("")}
+        </div>
       </li>`).join("");
   };
 
@@ -260,8 +266,14 @@ $$("[data-smoke]").forEach(c => {
     }
     if (e.target.closest("[data-open-cart]")) return open();
     if (e.target.closest("[data-close-cart]")) return close();
-    const inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]"), rm = e.target.closest("[data-rm]");
-    if (inc) cart[+inc.dataset.inc].q++;
+    const inc = e.target.closest("[data-inc]"), dec = e.target.closest("[data-dec]"), rm = e.target.closest("[data-rm]"), ex = e.target.closest("[data-extra]");
+    if (ex) {
+      const line = cart[+ex.dataset.extra], x = ex.dataset.x;
+      line.x = line.x || [];
+      line.x = line.x.includes(x) ? line.x.filter(v => v !== x) : [...line.x, x];
+      if (line.x.includes(x)) track("add_extra", { item: line.n, extra: x });
+    }
+    else if (inc) cart[+inc.dataset.inc].q++;
     else if (dec) { const k = +dec.dataset.dec; if (--cart[k].q < 1) cart.splice(k, 1); }
     else if (rm) cart.splice(+rm.dataset.rm, 1);
     else return;
@@ -276,9 +288,10 @@ $$("[data-smoke]").forEach(c => {
     const msg = [
       "Howdy Smoke Shack! New order:",
       "",
-      ...cart.map(i => `${i.q} x ${i.n} (${rand(i.p * i.q)})`),
+      ...cart.map(i => `${i.q} x ${i.n} (${rand(i.p * i.q)})${i.x && i.x.length ? `\n   extra ${i.x.join(", ").toLowerCase()}` : ""}`),
       "",
-      ...(fee() ? [`Delivery fee: ${rand(fee())}`] : []),
+      ...(fee() ? [`Delivery fee: from ${rand(fee())}, final fee by distance`] : []),
+      ...(fee() && dist ? [`Distance: about ${dist.km.toFixed(1)} km${dist.exact ? "" : " (suburb estimate)"}`] : []),
       `Total: ${rand(total())}`,
       `Name: ${d.get("name")}`,
       ...(d.get("mode") === "deliver"
@@ -298,6 +311,60 @@ $$("[data-smoke]").forEach(c => {
     timeLabel.textContent = d ? "Delivery time" : "Collection time";
   };
   form.addEventListener("change", e => { if (e.target.name === "mode") { syncMode(); render(); } });
+
+  const distBtn = $("[data-dist-btn]"), distOut = $("[data-dist-out]");
+  let dist = null, lastAsk = 0, distTimer;
+  const km = (a, b) => {
+    const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+    return 6371 * 2 * Math.asin(Math.sqrt(h)) * 1.3;
+  };
+  const seen = new Map();
+  const geocode = q => {
+    if (!seen.has(q)) seen.set(q, lookup(q).catch(e => { seen.delete(q); throw e; }));
+    return seen.get(q);
+  };
+  const lookup = async q => {
+    const wait = 1100 - (Date.now() - lastAsk);
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    lastAsk = Date.now();
+    const u = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=za&viewbox=27.05,-25.55,27.45,-25.85&q=" + encodeURIComponent(q);
+    const res = await fetch(u, { headers: { "Accept-Language": "en" } });
+    if (!res.ok) throw new Error("lookup failed");
+    const [hit] = await res.json();
+    return hit ? { lat: +hit.lat, lon: +hit.lon } : null;
+  };
+  const checkDistance = async () => {
+    const street = form.elements.address.value.trim(), suburb = form.elements.suburb.value.trim();
+    if (!street && !suburb) { distOut.className = "dist__out"; distOut.textContent = "Add your street address or suburb first."; return; }
+    distBtn.disabled = true;
+    distOut.className = "dist__out";
+    distOut.textContent = "Finding you on the map...";
+    try {
+      let spot = street ? await geocode([street, suburb, "Rustenburg"].filter(Boolean).join(", ")) : null, exact = !!spot;
+      if (!spot && suburb) spot = await geocode(`${suburb}, Rustenburg`);
+      if (!spot) { dist = null; distOut.textContent = "We couldn't find that on the map. No problem, we'll confirm the distance on WhatsApp."; return; }
+      dist = { km: km(SITE.shop, spot), exact };
+      const far = dist.km > 25;
+      distOut.className = "dist__out" + (far ? " warn" : "");
+      distOut.innerHTML = far
+        ? `About <b>${dist.km.toFixed(1)} km</b> away. That may be outside our delivery area; we'll confirm on WhatsApp.`
+        : `About <b>${dist.km.toFixed(1)} km</b> from the Shack${exact ? "" : " (based on your suburb)"}. Final fee confirmed on WhatsApp.`;
+      track("distance_check", { km: Math.round(dist.km), exact });
+    } catch {
+      dist = null;
+      distOut.textContent = "Couldn't check the distance right now. We'll confirm it on WhatsApp.";
+    } finally {
+      distBtn.disabled = false;
+    }
+  };
+  distBtn.addEventListener("click", checkDistance);
+  form.addEventListener("input", e => { if (e.target.name === "address" || e.target.name === "suburb") dist = null; });
+  form.addEventListener("change", e => {
+    if (e.target.name !== "address" && e.target.name !== "suburb") return;
+    clearTimeout(distTimer);
+    distTimer = setTimeout(checkDistance, 300);
+  });
   syncMode();
 
   render();
