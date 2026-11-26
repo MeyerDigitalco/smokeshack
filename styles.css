@@ -423,3 +423,6 @@ html.prelaunch .nav,html.prelaunch .fab,html.prelaunch .hero__scroll{visibility:
 .whole__deposit{margin:20px 0 0;padding:14px 16px;border-radius:var(--r);background:rgba(226,87,43,.1);box-shadow:inset 0 0 0 1px rgba(226,87,43,.45);font-size:15px;line-height:1.5;color:#efe6d6;max-width:52ch}
 .whole__deposit b{color:#ff8a3d}
 .total__note b{color:#ffb07a}
+html.prelaunch .launch{display:flex;flex-direction:column;padding-bottom:28px}
+.launch__inner{padding-bottom:0;margin:auto;flex:none}
+.launch__ticker{position:relative;left:auto;right:auto;bottom:auto;flex:none;margin:36px calc(-1 * var(--pad) - 20px) 0}
